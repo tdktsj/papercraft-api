@@ -1,12 +1,13 @@
 import os
 import requests
 import cv2
+import numpy as np
 from fastapi import FastAPI
 from pydantic import BaseModel
 
 app = FastAPI()
 
-# 📸 顔検出 + トリミング用関数
+# ✂️ 顔検出＋トリミング関数
 def detect_and_crop_face(input_path, output_path):
     image = cv2.imread(input_path)
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -22,9 +23,8 @@ def detect_and_crop_face(input_path, output_path):
         print("⚠️ No faces found.")
         return False
 
-    # 最初の顔だけトリミング
     (x, y, w, h) = faces[0]
-    padding = int(0.2 * h)  # 少し余白をつける
+    padding = int(0.2 * h)
     y1 = max(0, y - padding)
     y2 = min(image.shape[0], y + h + padding)
     x1 = max(0, x - padding)
@@ -36,6 +36,7 @@ def detect_and_crop_face(input_path, output_path):
     print(f"🖼️ Cropped face saved to {output_path}")
     return True
 
+# 🎀 SD風にデフォルメ画像を作成する関数
 def create_deform_image(input_path, output_path):
     img = cv2.imread(input_path)
 
@@ -45,25 +46,24 @@ def create_deform_image(input_path, output_path):
 
     height, width = img.shape[:2]
 
-    # 画像サイズを2倍に拡大して「顔強調」
+    # 拡大して顔を大きく表示
     scale = 2.0
     face_big = cv2.resize(img, (0, 0), fx=scale, fy=scale)
 
-    # 新しいキャンバスを作成（背景白）
+    # 白背景のキャンバスを作る
     canvas_size = (int(width * 2.5), int(height * 3))
     canvas = 255 * np.ones((canvas_size[1], canvas_size[0], 3), dtype=np.uint8)
 
-    # 顔の位置を真ん中上にペタッ（かわいさ重視💕）
+    # 顔を中央やや上に配置
     x_offset = (canvas.shape[1] - face_big.shape[1]) // 2
     y_offset = 30
-
-    canvas[y_offset:y_offset+face_big.shape[0], x_offset:x_offset+face_big.shape[1]] = face_big
+    canvas[y_offset:y_offset + face_big.shape[0], x_offset:x_offset + face_big.shape[1]] = face_big
 
     cv2.imwrite(output_path, canvas)
     print(f"🎀 SD-style image saved to {output_path}")
     return True
 
-# 📨 APIリクエストモデル
+# 📩 リクエストモデル
 class RequestData(BaseModel):
     photo_url: str
     email: str
@@ -80,7 +80,7 @@ async def generate(data: RequestData):
         photo_url = "https:" + photo_url
     print(f"📸 Downloading from: {photo_url}")
 
-    # 画像ダウンロード＆保存
+    # ダウンロードと保存
     response = requests.get(photo_url)
     os.makedirs("downloads", exist_ok=True)
     input_path = f"downloads/{data.request_id}.png"
@@ -88,15 +88,15 @@ async def generate(data: RequestData):
         f.write(response.content)
     print(f"✅ Saved to {input_path}")
 
-    # 顔検出＆トリミング
+    # 顔検出＋トリミング
     cropped_path = f"downloads/{data.request_id}_cropped.png"
     success = detect_and_crop_face(input_path, cropped_path)
 
     if success:
-        # ✅ トリミング成功 → 次にデフォルメ画像を生成！
+        # デフォルメ画像生成
         deform_path = f"downloads/{data.request_id}_deform.png"
         created = create_deform_image(cropped_path, deform_path)
-    
+
         if created:
             message = f"Cropped face saved to {cropped_path} | Deformed image saved to {deform_path}"
         else:
