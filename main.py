@@ -39,6 +39,9 @@ def detect_and_crop_face(input_path, output_path):
 
 # 🎀 SD風にデフォルメ画像を作成する関数
 def create_deform_image(input_path, output_path):
+    import cv2
+    import numpy as np
+
     img = cv2.imread(input_path)
 
     if img is None:
@@ -47,23 +50,26 @@ def create_deform_image(input_path, output_path):
 
     height, width = img.shape[:2]
 
-    # 拡大して顔を大きく表示
-    scale = 2.0
-    face_big = cv2.resize(img, (0, 0), fx=scale, fy=scale)
+    # 💡 横を少し伸ばして、縦を少し縮める＝SD体型っぽさUP
+    deform = cv2.resize(img, (int(width * 1.2), int(height * 0.8)), interpolation=cv2.INTER_CUBIC)
 
-    # 白背景のキャンバスを作る
-    canvas_size = (int(width * 2.5), int(height * 3))
-    canvas = 255 * np.ones((canvas_size[1], canvas_size[0], 3), dtype=np.uint8)
+    # 💡 白背景のキャンバス
+    canvas_h = deform.shape[0] + 60
+    canvas_w = deform.shape[1] + 60
+    canvas = 255 * np.ones((canvas_h, canvas_w, 3), dtype=np.uint8)
 
-    # 顔を中央やや上に配置
-    x_offset = (canvas.shape[1] - face_big.shape[1]) // 2
-    y_offset = 30
-    canvas[y_offset:y_offset + face_big.shape[0], x_offset:x_offset + face_big.shape[1]] = face_big
+    # 💡 キャンバス中央に貼り付け
+    y_offset = (canvas.shape[0] - deform.shape[0]) // 2
+    x_offset = (canvas.shape[1] - deform.shape[1]) // 2
+    canvas[y_offset:y_offset+deform.shape[0], x_offset:x_offset+deform.shape[1]] = deform
 
-    cv2.imwrite(output_path, canvas)
+    # 💡 軽く輪郭強調して「フィルターかかった」感出す
+    blur = cv2.GaussianBlur(canvas, (3, 3), 0)
+    sharpened = cv2.addWeighted(canvas, 1.5, blur, -0.5, 0)
+
+    cv2.imwrite(output_path, sharpened)
     print(f"🎀 SD-style image saved to {output_path}")
     return True
-
 # 📩 リクエストモデル
 class RequestData(BaseModel):
     photo_url: str
