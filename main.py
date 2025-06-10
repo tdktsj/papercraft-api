@@ -36,6 +36,33 @@ def detect_and_crop_face(input_path, output_path):
     print(f"🖼️ Cropped face saved to {output_path}")
     return True
 
+def create_deform_image(input_path, output_path):
+    img = cv2.imread(input_path)
+
+    if img is None:
+        print("❌ 画像が読み込めませんでした")
+        return False
+
+    height, width = img.shape[:2]
+
+    # 画像サイズを2倍に拡大して「顔強調」
+    scale = 2.0
+    face_big = cv2.resize(img, (0, 0), fx=scale, fy=scale)
+
+    # 新しいキャンバスを作成（背景白）
+    canvas_size = (int(width * 2.5), int(height * 3))
+    canvas = 255 * np.ones((canvas_size[1], canvas_size[0], 3), dtype=np.uint8)
+
+    # 顔の位置を真ん中上にペタッ（かわいさ重視💕）
+    x_offset = (canvas.shape[1] - face_big.shape[1]) // 2
+    y_offset = 30
+
+    canvas[y_offset:y_offset+face_big.shape[0], x_offset:x_offset+face_big.shape[1]] = face_big
+
+    cv2.imwrite(output_path, canvas)
+    print(f"🎀 SD-style image saved to {output_path}")
+    return True
+
 # 📨 APIリクエストモデル
 class RequestData(BaseModel):
     photo_url: str
@@ -66,7 +93,15 @@ async def generate(data: RequestData):
     success = detect_and_crop_face(input_path, cropped_path)
 
     if success:
-        message = f"Cropped face saved to {cropped_path}"
+        # ✅ トリミング成功 → 次にデフォルメ画像を生成！
+        deform_path = f"downloads/{data.request_id}_deform.png"
+        created = create_deform_image(cropped_path, deform_path)
+    
+        if created:
+            message = f"Cropped face saved to {cropped_path} | Deformed image saved to {deform_path}"
+        else:
+            message = f"Cropped face saved to {cropped_path}, but deform failed"
+
     else:
         message = "Face not detected."
 
