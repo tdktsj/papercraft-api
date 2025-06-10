@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 from fastapi import FastAPI
 from pydantic import BaseModel
+from fastapi.responses import FileResponse
 
 app = FastAPI()
 
@@ -106,3 +107,11 @@ async def generate(data: RequestData):
         message = "Face not detected."
 
     return {"status": "ok", "message": message}
+
+# デフォルメされた画像の確認用
+@app.get("/preview/{filename}")
+def preview_image(filename: str):
+    file_path = f"downloads/{filename}"
+    if os.path.exists(file_path):
+        return FileResponse(file_path, media_type="image/png")
+    return {"error": "File not found"}
